@@ -10,13 +10,19 @@
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
-    "@oclif/plugin-plugins": "^5"
+    "@oclif/plugin-plugins": "^5",
+    "chalk": "^5.4.1",
+    "find-up": "^7.0.0",
+    "fs-extra": "^11.3.0",
+    "inquirer": "^12.7.0",
+    "ora": "^8.2.0"
   },
   "devDependencies": {
     "@eslint/compat": "^1",
     "@oclif/prettier-config": "^0.2.1",
     "@oclif/test": "^4",
     "@types/chai": "^4",
+    "@types/fs-extra": "^11.0.4",
     "@types/mocha": "^10",
     "@types/node": "^18",
     "chai": "^4",
