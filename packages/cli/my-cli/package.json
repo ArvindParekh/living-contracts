@@ -6,7 +6,7 @@
   "bin": {
     "living-contracts": "./bin/run.js"
   },
-  "bugs": "https://github.com/https://github.com/ArvindParekh/living-contracts/living-contracts/issues",
+  "bugs": "https://github.com/ArvindParekh/living-contracts/issues",
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
