@@ -1,135 +1,250 @@
-# Turborepo starter
+# Living Contracts 🔄
 
-This Turborepo starter is maintained by the Turborepo core team.
+> **Never let your API drift from your database schema again.** Living Contracts watches your Prisma schema and automatically generates type-safe APIs, SDKs, validation rules, and documentation that evolve with your data.
 
-## Using this example
+[![npm version](https://img.shields.io/npm/v/living-contracts.svg)](https://www.npmjs.com/package/living-contracts)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-Run the following command:
+## The Problem
 
-```sh
-npx create-turbo@latest
+Every TypeScript developer knows this pain:
+
+```typescript
+// Monday: Backend updates the schema
+model User {
+  username String
+  email String
+  phoneNumber String? // NEW FIELD
+}
+
+// Wednesday: Frontend breaks in production
+// TypeScript types? Outdated.
+// API docs? Still showing old schema.
+// Validation? Rejecting the new field.
 ```
 
-## What's inside?
+## The Solution
 
-This Turborepo includes the following packages/apps:
+Living Contracts creates a **living connection** between your database and your entire API surface:
 
-### Apps and Packages
+```bash
+npx living-contracts watch
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+✨ Watching schema.prisma...
+📝 Schema change detected!
+🔄 Regenerating TypeScript SDK...
+🔄 Updating API endpoints...
+🔄 Learning validation rules from data...
+📚 Updating documentation...
+✅ Everything in sync!
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+## Features
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+### 🧠 **Intelligent Validation**
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+Instead of guessing validation rules, Living Contracts learns from your actual data:
 
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+```typescript
+// Analyzes your database and discovers:
+username: string  // 4-28 chars, lowercase, allows underscores
+email: string     // valid emails, max 255 chars
+price: number     // 0.99-9999.99, always 2 decimal places
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+### 🚨 **Breaking Change Detection**
+
+Know exactly what breaks before you deploy:
 
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+⚠️  Breaking Change Detected!
+Field renamed: username → userName
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+Affected:
+- 17 API endpoints
+- 43 frontend components
+- 3 mobile apps
+
+📋 Migration guide generated with AI assistance
 ```
 
-### Remote Caching
+### 🔄 **Always in Sync**
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+- **TypeScript SDK** - Type-safe client with perfect IntelliSense
+- **API Endpoints** - REST/GraphQL endpoints that match your schema
+- **Validation** - Zod schemas based on real data patterns
+- **Documentation** - Always current, never lies
+- **Tests** - Generated from actual usage patterns
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+## Quick Start
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+```bash
+# Install globally
+npm install -g living-contracts
 
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+# Or use npx
+npx living-contracts init
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+### Setup in your project
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+```bash
+# In your Prisma project
+living-contracts init
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+# Start watching for changes
+living-contracts watch
 ```
 
-## Useful Links
+### Use the generated SDK
 
-Learn more about the power of Turborepo:
+```typescript
+// Import your auto-generated, type-safe SDK
+import { api } from './generated/sdk'
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+// Perfect IntelliSense, always up-to-date
+const user = await api.users.create({
+  username: 'alice',     // ✅ Validates: 4-28 chars
+  email: 'alice@example.com',
+  phoneNumber: '+1234567890'  // ✅ New field already typed!
+})
+```
+
+## How It Works
+
+```mermaid
+graph LR
+    A[Prisma Schema] --> B[Living Contracts]
+    C[Database Data] --> B
+    B --> D[TypeScript SDK]
+    B --> E[API Endpoints]
+    B --> F[Validation Rules]
+    B --> G[Documentation]
+    B --> H[Migration Guides]
+```
+
+1. **Watches** your Prisma schema for changes
+1. **Analyzes** your actual database data to infer patterns
+1. **Generates** everything you need for a type-safe API
+1. **Detects** breaking changes before they break
+1. **Guides** migrations with AI-powered suggestions
+
+## CLI Commands
+
+```bash
+living-contracts init          # Initialize in your project
+living-contracts generate      # One-time generation
+living-contracts watch         # Watch mode (recommended)
+living-contracts validate      # CI/CD validation
+living-contracts analyze       # Analyze data patterns
+```
+
+## Configuration
+
+`.living-contracts.json`:
+
+```json
+{
+  "output": "./generated",
+  "generators": ["sdk", "api", "validation", "docs"],
+  "watch": true,
+  "inferValidation": true,
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-4"
+  }
+}
+```
+
+## Example Output Structure
+
+```
+generated/
+├── sdk/
+│   ├── index.ts         # Type-safe client
+│   ├── types.ts         # Generated TypeScript types
+│   └── client.ts        # API client with React Query hooks
+├── api/
+│   ├── users.ts         # User endpoints
+│   └── [...].ts         # Other model endpoints
+├── validation/
+│   └── schemas.ts       # Zod validation schemas
+└── docs/
+    └── api.md           # Auto-generated API documentation
+```
+
+## Advanced Features
+
+### Custom Generators
+
+```typescript
+// .living-contracts.config.ts
+export default {
+  generators: {
+    custom: async (schema, data) => {
+      // Your custom generation logic
+    }
+  }
+}
+```
+
+### Hooks
+
+```json
+{
+  "hooks": {
+    "beforeGenerate": ["npm run lint:fix"],
+    "afterGenerate": ["npm run test:generated"]
+  }
+}
+```
+
+### Multi-Database Support
+
+```bash
+living-contracts generate --schema ./tenant1/schema.prisma
+living-contracts generate --schema ./tenant2/schema.prisma
+```
+
+## Roadmap
+
+- [x] TypeScript SDK generation
+- [x] Validation inference from data
+- [x] Breaking change detection
+- [ ] GraphQL support
+- [ ] Python/Go/Java SDKs
+- [ ] VS Code extension
+- [ ] GitHub Actions integration
+- [ ] Team collaboration features
+
+## Contributing
+
+We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+```bash
+# Clone the repo
+git clone https://github.com/yourusername/living-contracts
+cd living-contracts
+
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+
+# Build
+npm run build
+```
+
+## Why “Living Contracts”?
+
+Traditional API contracts are static documents that drift from reality. Living Contracts are **alive** - they grow and evolve with your application, always reflecting the truth of your data.
+
+## License
+
+MIT © 2025
+
+-----
+
+Built with ❤️ by developers who were tired of API drift.
