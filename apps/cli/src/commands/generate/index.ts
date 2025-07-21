@@ -4,12 +4,19 @@ import chalk from 'chalk'
 import * as fs from "fs-extra"
 import ora from 'ora'
 import path from 'path'
+import { Project, ScriptTarget } from 'ts-morph'
 
 interface GeneratorConfig {
   output: string
   generators: string[]
   inferValidation: boolean
   prismaSchema: string
+}
+
+interface ParsedSchema {
+  models: any[]
+  enums: any[]
+  datasources: any[]
 }
 
 export default class Generate extends Command {
@@ -33,7 +40,8 @@ export default class Generate extends Command {
     }),
   }
 
-  private config: GeneratorConfig;
+  private configuration!: GeneratorConfig;
+  private tsProject!: Project;
 
   async run(): Promise<void> {
 
@@ -45,8 +53,8 @@ export default class Generate extends Command {
     // load config
     const configSpinner = ora('Loading configuration...').start();
     try {
-      this.config = await this.loadConfig();
-      if (flags.infer) this.config.inferValidation = flags.infer;
+      this.configuration = await this.loadConfig();
+      if (flags.infer) this.configuration.inferValidation = flags.infer;
       configSpinner.succeed('Configuration loaded');
     } catch(error) {
       configSpinner.fail(chalk.bold.red('Failed to load configuration.'));
@@ -55,9 +63,27 @@ export default class Generate extends Command {
 
 
     // parse prisma schema
+    const schemaSpinner = ora('Parsing Prisma schema...').start();
+
+    let parsedSchema: ParsedSchema;
+    try {
+      parsedSchema = await this.parseSchema(this.configuration.prismaSchema);
+      schemaSpinner.succeed(`Found ${parsedSchema.models.length} models`);
+    } catch (error) {
+      schemaSpinner.fail(chalk.bold.red('Failed to parse Prisma schema.'));
+      this.error('Please check your Prisma schema file and try again.');
+    }
 
 
     // init a ts project for code generation
+    const projectSpinner = ora('Initializing TypeScript project...').start();
+    try {
+      this.tsProject = await this.initTsProject(this.configuration.output);
+      projectSpinner.succeed('TypeScript project initialized');
+    } catch (error) {
+      projectSpinner.fail(chalk.bold.red('Failed to initialize TypeScript project.'));
+      this.error('Failed to create a new TypeScript project. Please check your project directory and try again.');
+    }
 
 
     // connect to db for validation inference
@@ -79,5 +105,33 @@ export default class Generate extends Command {
 
     return await fs.readJson(configPath) as GeneratorConfig;
 
+  }
+
+  private async parseSchema(schemaPath: string): Promise<ParsedSchema> {
+    const absolutePath = path.resolve(process.cwd(), schemaPath); // do we need entirely absolute path here?
+    const schema = await getDMMF({
+      datamodel: absolutePath
+    })
+
+    return {
+      models: Array.from(schema.datamodel.models),
+      enums: Array.from(schema.datamodel.enums),
+      datasources: []
+    }
+  }
+
+  private async initTsProject(outputDir: string): Promise<Project> {
+    const newProject = new Project({
+      compilerOptions: {
+        target: ScriptTarget.ES2022,
+        module: 1,
+        strict: true,
+        esModuleInterop: true,
+        skipLibCheck: true,
+        forceConsistentCasingInFileNames: true, 
+      }
+    })
+
+    return newProject;
   }
 }
