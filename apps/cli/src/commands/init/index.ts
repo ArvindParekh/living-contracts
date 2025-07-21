@@ -1,7 +1,7 @@
 import {Command, Flags} from '@oclif/core'
 import chalk from 'chalk'
 import {findUp} from 'find-up'
-import inquirer, { createPromptModule } from 'inquirer'
+import { createPromptModule } from 'inquirer'
 import ora from 'ora'
 import path from 'path'
 import fs from 'fs-extra'
@@ -116,7 +116,7 @@ Initialize a new living contracts project
       generators: answers.generators,
       watch: answers.watch,
       inferValidation: answers.validation,
-      prismaSchema: 'path here',
+      prismaSchema: projectInfo.prismaSchema,
       include: ['**/*.prisma'],
       exclude: ['node_modules/**', 'dist/**', 'build/**'],
       hooks: {
