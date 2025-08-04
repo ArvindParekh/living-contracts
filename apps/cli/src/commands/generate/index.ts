@@ -1,6 +1,6 @@
 import {Command, Flags} from '@oclif/core'
 import {PrismaClient} from '@prisma/client'
-import { DMMF } from '@prisma/client/runtime/library.js'
+import {DMMF} from '@prisma/client/runtime/library.js'
 import {getDMMF, getConfig} from '@prisma/internals'
 import chalk from 'chalk'
 import * as fs from 'fs-extra'
@@ -220,7 +220,7 @@ export default class Generate extends Command {
         files.push(await this.generateAPI(parsedSchema, validationRules, outputBaseDir))
         break
       case 'validation':
-        files.push(await this.generateValidation(parsedSchema, validationRules, outputBaseDir))
+        files.push(...(await this.generateValidation(parsedSchema, validationRules, outputBaseDir)))
         break
       case 'docs':
         files.push(await this.generateDocs(parsedSchema, validationRules, outputBaseDir))
@@ -248,7 +248,104 @@ export default class Generate extends Command {
     parsedSchema: ParsedSchema,
     validationRules: Record<string, any[]>,
     outputBaseDir: string,
-  ): Promise<string> {}
+  ): Promise<string[]> {
+    const files: string[] = [];
+
+    const schemas = parsedSchema.models.map((model) => {
+      const rules = validationRules[model.name] || []
+      const validationFields = model.fields
+        .filter((field) => field.kind !== 'object')
+        .map((field) => {
+          const rule = rules.find((r) => r.field === field.name)
+          return this.generateZodField(field, rule)
+        })
+      return `export const ${model.name}Schema = z.object({\n ${validationFields}\n}\n\nexport type ${model.name}Input = z.infer<typeof ${model.name}Schema>)`;
+    }).join('\n\n');
+
+    const content = `// Generated Zod validation schemas
+import { z } from 'zod'
+
+${schemas}
+
+// Export all schemas
+export const schemas = {
+${parsedSchema.models.map((m) => `  ${m.name}: ${m.name}Schema`).join(',\n')}
+}
+`
+
+    this.tsProject.createSourceFile(
+      path.join(outputBaseDir, 'schema.ts'),
+      content,
+      { overwrite: true }
+    )
+    files.push('validation/schema.ts')
+
+    return files
+  }
+
+  private generateZodField(field: DMMF.Field, rule: any): string {
+    let zod = ''
+
+    switch (field.type) {
+      case 'String':
+        zod = 'z.string()'
+        if (rule) {
+          if (rule.min) zod += `.min(${rule.min}, 'Must be at least ${rule.min} characters')`
+          if (rule.max) zod += `.max(${rule.max}, 'Must be at most ${rule.max} characters')`
+          if (rule.pattern) zod += `.regex(${rule.pattern}, 'Must match pattern ${rule.pattern}')`
+        }
+        break
+      case 'Int':
+        zod = 'z.number().int()'
+        if (rule) {
+          if (rule.min !== undefined) zod += `.min(${rule.min}, 'Must be at least ${rule.min}')`
+          if (rule.max !== undefined) zod += `.max(${rule.max}, 'Must be at most ${rule.max}')`
+        }
+        break
+      case 'Float':
+        zod = 'z.number().float()'
+        if (rule) {
+          if (rule.min !== undefined) zod += `.min(${rule.min}, 'Must be at least ${rule.min}')`
+          if (rule.max !== undefined) zod += `.max(${rule.max}, 'Must be at most ${rule.max}')`
+        }
+        break
+      case 'Boolean':
+        zod = 'z.boolean()'
+        break
+      case 'DateTime':
+        zod = 'z.date()'
+        break
+      case 'Json':
+        zod = 'z.any()'
+        break
+      case 'Decimal':
+        zod = 'z.number().decimal()'
+        if (rule) {
+          if (rule.min !== undefined) zod += `.min(${rule.min}, 'Must be at least ${rule.min}')`
+          if (rule.max !== undefined) zod += `.max(${rule.max}, 'Must be at most ${rule.max}')`
+        }
+        break
+      case 'BigInt':
+        zod = 'z.bigint()'
+        if (rule) {
+          if (rule.min !== undefined) zod += `.min(${rule.min}, 'Must be at least ${rule.min}')`
+        }
+        break
+      default:
+        if (field.type.startsWith('Enum_')) {
+          const enumName = field.type.replace('Enum_', '')
+          zod = `z.nativeEnum(${enumName})`
+        } else {
+          zod = 'z.any()'
+        }
+        break
+    }
+
+    if (!field.isRequired) zod += '.optional()'
+
+    if (field.isList) zod += `z.array(${zod})`
+    return `${field.name}: ${zod}`
+  }
 
   private async generateDocs(
     parsedSchema: ParsedSchema,
@@ -256,28 +353,103 @@ export default class Generate extends Command {
     outputBaseDir: string,
   ): Promise<string> {}
 
+  private generateClient(schema: ParsedSchema): string {
+    const modelClients = schema.models
+      .map((model) => {
+        const modelLowerCase = model.name.toLowerCase()
+        const modelPlural = modelLowerCase.endsWith('s') ? modelLowerCase : `${modelLowerCase}s`
+
+        return `
+      ${modelPlural} : {
+       create: (data: Omit<${model.name}, 'id' | 'createdAt' | 'updatedAt'>) : Promise<${model.name}> => {
+          const response = await fetch(\`\${this.baseURL}/${modelPlural}\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!response.ok) throw new Error(\`Failed to create ${model.name}\`)
+      return response.json()
+    },
+
+    findMany: async (params?: { skip?: number; take?: number; where?: Partial<${model.name}> }): Promise<${model.name}[]> => {
+      const query = new URLSearchParams()
+      if (params?.skip) query.set('skip', params.skip.toString())
+      if (params?.take) query.set('take', params.take.toString())
+      if (params?.where) query.set('where', JSON.stringify(params.where))
+      
+      const response = await fetch(\`\${this.baseURL}/${modelPlural}?\${query}\`)
+      if (!response.ok) throw new Error(\`Failed to fetch ${modelPlural}\`)
+      return response.json()
+    },
+
+    findById: async (id: string | number): Promise<${model.name} | null> => {
+      const response = await fetch(\`\${this.baseURL}/${modelPlural}/\${id}\`)
+      if (response.status === 404) return null
+      if (!response.ok) throw new Error(\`Failed to fetch ${model.name}\`)
+      return response.json()
+    },
+
+    update: async (id: string | number, data: Partial<Omit<${model.name}, 'id' | 'createdAt' | 'updatedAt'>>): Promise<${model.name}> => {
+      const response = await fetch(\`\${this.baseURL}/${modelPlural}/\${id}\`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!response.ok) throw new Error(\`Failed to update ${model.name}\`)
+      return response.json()
+    },
+
+    delete: async (id: string | number): Promise<void> => {
+      const response = await fetch(\`\${this.baseURL}/${modelPlural}/\${id}\`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) throw new Error(\`Failed to delete ${model.name}\`)
+    },
+  }`
+      })
+      .join(',\n\n')
+
+    return `// Generated API client
+import type { ${schema.models.map((m) => m.name).join(', ')} } from './types'
+
+export class APIClient {
+  constructor(private baseURL: string) {}
+
+${modelClients}
+}
+
+// Default client instance
+export const api = new APIClient(process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || '/api')
+`
+  }
+
   private generateTypes(schema: ParsedSchema): string {
-    const types = schema.models.map((model) => {
-      const fields = model.fields
-        .filter((field) => field.type === 'object')
-        .map((field) => {
-          const type = this.getPrismaType(field)
-          const optional = field.isRequired ? '' : '?'
-          return `${field.name}: ${type}${optional}`
-        })
-        .join('\n')
+    const types = schema.models
+      .map((model) => {
+        const fields = model.fields
+          .filter((field) => field.kind !== 'object')
+          .map((field) => {
+            const type = this.getPrismaType(field)
+            const optional = field.isRequired ? '' : '?'
+            return `${field.name}: ${type}${optional}`
+          })
+          .join('\n')
 
-      return `export interface ${model.name} {\n${fields}\n}`
-    }).join('\n\n');
+        return `export interface ${model.name} {\n${fields}\n}`
+      })
+      .join('\n\n')
 
-    const enumTypes = schema.enums.map((enumDef) => {
-      const values = enumDef.values.map((value) => {
-        return `  ${value.name} = '${value.name}'`
-      }).join(',\n')
+    const enumTypes = schema.enums
+      .map((enumDef) => {
+        const values = enumDef.values
+          .map((value) => {
+            return `  ${value.name} = '${value.name}'`
+          })
+          .join(',\n')
 
-      return `export enum ${enumDef.name} {\n${values}\n}`
-    }).join('\n\n');
-
+        return `export enum ${enumDef.name} {\n${values}\n}`
+      })
+      .join('\n\n')
 
     return `// Generated types from Prisma schema
     // Do not edit manually!
@@ -287,7 +459,6 @@ export default class Generate extends Command {
     ${enumTypes}
     `
   }
-
 
   private getPrismaType(field: DMMF.Field): string {
     const typeMap: Record<string, string> = {
