@@ -1,5 +1,6 @@
 import {Command, Flags} from '@oclif/core'
 import {PrismaClient} from '@prisma/client'
+import { DMMF } from '@prisma/client/runtime/library.js'
 import {getDMMF, getConfig} from '@prisma/internals'
 import chalk from 'chalk'
 import * as fs from 'fs-extra'
@@ -15,8 +16,8 @@ interface GeneratorConfig {
 }
 
 interface ParsedSchema {
-  models: any[]
-  enums: any[]
+  models: DMMF.Model[]
+  enums: DMMF.DatamodelEnum[]
   datasources: any[]
 }
 
@@ -254,4 +255,51 @@ export default class Generate extends Command {
     validationRules: Record<string, any[]>,
     outputBaseDir: string,
   ): Promise<string> {}
+
+  private generateTypes(schema: ParsedSchema): string {
+    const types = schema.models.map((model) => {
+      const fields = model.fields
+        .filter((field) => field.type === 'object')
+        .map((field) => {
+          const type = this.getPrismaType(field)
+          const optional = field.isRequired ? '' : '?'
+          return `${field.name}: ${type}${optional}`
+        })
+        .join('\n')
+
+      return `export interface ${model.name} {\n${fields}\n}`
+    }).join('\n\n');
+
+    const enumTypes = schema.enums.map((enumDef) => {
+      const values = enumDef.values.map((value) => {
+        return `  ${value.name} = '${value.name}'`
+      }).join(',\n')
+
+      return `export enum ${enumDef.name} {\n${values}\n}`
+    }).join('\n\n');
+
+
+    return `// Generated types from Prisma schema
+    // Do not edit manually!
+    
+    ${types}
+    
+    ${enumTypes}
+    `
+  }
+
+
+  private getPrismaType(field: DMMF.Field): string {
+    const typeMap: Record<string, string> = {
+      String: 'string',
+      Int: 'number',
+      Float: 'number',
+      Boolean: 'boolean',
+      DateTime: 'Date',
+      Json: 'any',
+      Decimal: 'number',
+      BigInt: 'bigint',
+    }
+    return typeMap[field.type] || 'any'
+  }
 }

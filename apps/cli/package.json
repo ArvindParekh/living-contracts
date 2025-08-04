@@ -13,6 +13,7 @@
     "@oclif/plugin-plugins": "^5",
     "@prisma/client": "^6.12.0",
     "@prisma/internals": "^6.11.1",
+    "ai": "^4.3.19",
     "chalk": "^5.4.1",
     "find-up": "^7.0.0",
     "fs-extra": "^11.3.0",
