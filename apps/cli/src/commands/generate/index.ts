@@ -217,7 +217,7 @@ export default class Generate extends Command {
         files.push(await this.generateSDK(parsedSchema, validationRules, outputBaseDir))
         break
       case 'api':
-        files.push(await this.generateAPI(parsedSchema, validationRules, outputBaseDir))
+        files.push(...(await this.generateAPI(parsedSchema, validationRules, outputBaseDir)))
         break
       case 'validation':
         files.push(...(await this.generateValidation(parsedSchema, validationRules, outputBaseDir)))
@@ -242,25 +242,103 @@ export default class Generate extends Command {
     parsedSchema: ParsedSchema,
     validationRules: Record<string, any[]>,
     outputBaseDir: string,
-  ): Promise<string> {}
+  ): Promise<string[]> {
+    const files: string[] = []
+
+    const schema = parsedSchema.models.map((model) => {
+      const content = this.generateAPIEndpoint(model)
+      const fileName = `${model.name.toLowerCase()}s.ts`
+
+      this.tsProject.createSourceFile(path.join(outputBaseDir, fileName), content, {overwrite: true})
+      files.push(`/api/${fileName}`)
+    })
+
+    // generate index file
+    const indexContent = `// Generated API routes
+${parsedSchema.models.map((m) => `export * as ${m.name.toLowerCase()} from './${m.name.toLowerCase()}s'`).join('\n')}
+`
+    this.tsProject.createSourceFile(path.join(outputBaseDir, 'index.ts'), indexContent, {overwrite: true})
+    files.push('api/index.ts')
+
+    return files
+  }
+
+  private generateAPIEndpoint(model: DMMF.Model): string {
+    const modelLowerCase = model.name.toLowerCase()
+    const modelPlural = modelLowerCase.endsWith('s') ? modelLowerCase : `${modelLowerCase}s`
+
+    return `// Generated API endpoints for ${model.name}
+import { PrismaClient } from '@prisma/client'
+import { ${model.name}Schema } from '../validation/schemas'
+import type { ${model.name} } from '../sdk/types'
+
+const prisma = new PrismaClient()
+
+// GET /${modelPlural}
+export async function findMany(params?: {
+  skip?: number
+  take?: number
+  where?: any
+}): Promise<${model.name}[]> {
+  return prisma.${modelLowerCase}.findMany({
+    skip: params?.skip,
+    take: params?.take,
+    where: params?.where,
+  })
+}
+
+// GET /${modelPlural}/:id
+export async function findById(id: string | number): Promise<${model.name} | null> {
+  return prisma.${modelLowerCase}.findUnique({
+    where: { id },
+  })
+}
+
+// POST /${modelPlural}
+export async function create(data: any): Promise<${model.name}> {
+  const validated = ${model.name}Schema.parse(data)
+  return prisma.${modelLowerCase}.create({
+    data: validated,
+  })
+}
+
+// PATCH /${modelPlural}/:id
+export async function update(id: string | number, data: any): Promise<${model.name}> {
+  const validated = ${model.name}Schema.partial().parse(data)
+  return prisma.${modelLowerCase}.update({
+    where: { id },
+    data: validated,
+  })
+}
+
+// DELETE /${modelPlural}/:id
+export async function remove(id: string | number): Promise<void> {
+  await prisma.${modelLowerCase}.delete({
+    where: { id },
+  })
+}
+`
+  }
 
   private async generateValidation(
     parsedSchema: ParsedSchema,
     validationRules: Record<string, any[]>,
     outputBaseDir: string,
   ): Promise<string[]> {
-    const files: string[] = [];
+    const files: string[] = []
 
-    const schemas = parsedSchema.models.map((model) => {
-      const rules = validationRules[model.name] || []
-      const validationFields = model.fields
-        .filter((field) => field.kind !== 'object')
-        .map((field) => {
-          const rule = rules.find((r) => r.field === field.name)
-          return this.generateZodField(field, rule)
-        })
-      return `export const ${model.name}Schema = z.object({\n ${validationFields}\n}\n\nexport type ${model.name}Input = z.infer<typeof ${model.name}Schema>)`;
-    }).join('\n\n');
+    const schemas = parsedSchema.models
+      .map((model) => {
+        const rules = validationRules[model.name] || []
+        const validationFields = model.fields
+          .filter((field) => field.kind !== 'object')
+          .map((field) => {
+            const rule = rules.find((r) => r.field === field.name)
+            return this.generateZodField(field, rule)
+          })
+        return `export const ${model.name}Schema = z.object({\n ${validationFields}\n}\n\nexport type ${model.name}Input = z.infer<typeof ${model.name}Schema>)`
+      })
+      .join('\n\n')
 
     const content = `// Generated Zod validation schemas
 import { z } from 'zod'
@@ -273,11 +351,7 @@ ${parsedSchema.models.map((m) => `  ${m.name}: ${m.name}Schema`).join(',\n')}
 }
 `
 
-    this.tsProject.createSourceFile(
-      path.join(outputBaseDir, 'schema.ts'),
-      content,
-      { overwrite: true }
-    )
+    this.tsProject.createSourceFile(path.join(outputBaseDir, 'schema.ts'), content, {overwrite: true})
     files.push('validation/schema.ts')
 
     return files
