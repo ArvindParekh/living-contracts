@@ -48,7 +48,7 @@ importers:
         specifier: ^5
         version: 5.4.46
       '@prisma/client':
-        specifier: ^6.12.0
+        specifier: ^6.13.0
         version: 6.13.0(typescript@5.9.2)
       '@prisma/internals':
         specifier: ^6.11.1
@@ -215,6 +215,10 @@ importers:
       ts-morph:
         specifier: ^26.0.0
         version: 26.0.0
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
 
   packages/core/schema-parser:
     dependencies:
@@ -273,24 +277,52 @@ importers:
       ts-morph:
         specifier: ^26.0.0
         version: 26.0.0
+    devDependencies:
+      '@types/node':
+        specifier: ^24.2.0
+        version: 24.2.0
 
   packages/generators/docs:
     dependencies:
+      '@prisma/client':
+        specifier: ^6.13.0
+        version: 6.13.0(typescript@5.9.2)
       ts-morph:
         specifier: ^26.0.0
         version: 26.0.0
+    devDependencies:
+      '@types/node':
+        specifier: ^24.2.0
+        version: 24.2.0
 
   packages/generators/sdk:
     dependencies:
       ts-morph:
         specifier: ^26.0.0
         version: 26.0.0
+    devDependencies:
+      '@types/node':
+        specifier: ^24.2.0
+        version: 24.2.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
 
   packages/generators/validation:
     dependencies:
+      '@prisma/client':
+        specifier: ^6.13.0
+        version: 6.13.0(typescript@5.9.2)
       ts-morph:
         specifier: ^26.0.0
         version: 26.0.0
+    devDependencies:
+      '@types/node':
+        specifier: ^24.2.0
+        version: 24.2.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
 
   packages/typescript-config: {}
 
@@ -5578,7 +5610,7 @@ snapshots:
   '@types/fs-extra@11.0.4':
     dependencies:
       '@types/jsonfile': 6.1.4
-      '@types/node': 18.19.121
+      '@types/node': 24.2.0
 
   '@types/http-cache-semantics@4.0.4': {}
 
@@ -5588,7 +5620,7 @@ snapshots:
 
   '@types/jsonfile@6.1.4':
     dependencies:
-      '@types/node': 18.19.121
+      '@types/node': 24.2.0
 
   '@types/lodash@4.17.20': {}
 
@@ -5596,7 +5628,7 @@ snapshots:
 
   '@types/mute-stream@0.0.4':
     dependencies:
-      '@types/node': 18.19.121
+      '@types/node': 24.2.0
 
   '@types/node@18.19.121':
     dependencies:

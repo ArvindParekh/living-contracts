@@ -1,5 +1,6 @@
 import {Command, Flags} from '@oclif/core'
-import {PrismaClient} from '@prisma/client'
+import {SchemaParser} from '@living-contracts/schema-parser'
+import { PrismaClient } from '@prisma/client/extension'
 import {DMMF} from '@prisma/client/runtime/library.js'
 import {getDMMF, getConfig} from '@prisma/internals'
 import chalk from 'chalk'
@@ -8,7 +9,6 @@ import ora from 'ora'
 import path from 'path'
 import { CodeGeneratorEngine } from '@living-contracts/code-generator'
 import {Project, ScriptTarget} from 'ts-morph'
-import {SchemaParser} from '@living-contracts/schema-parser'
 
 interface GeneratorConfig {
   output: string
@@ -113,8 +113,6 @@ export default class Generate extends Command {
         const datasourceUrl = prismaConfig.datasources[0].url.value
 
         if (datasourceUrl) {
-          const {PrismaClient} = await import('@prisma/client')
-
           dbSpinner.text = 'Inferring validation rules from database...'
           this.prisma = new PrismaClient({
             datasourceUrl: datasourceUrl,

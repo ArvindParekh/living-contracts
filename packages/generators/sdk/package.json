@@ -4,8 +4,14 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "ts-morph": "^26.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.0",
+    "typescript": "^5.9.2"
   }
 }
