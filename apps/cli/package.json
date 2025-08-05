@@ -14,6 +14,7 @@
     "@living-contracts/generator-sdk": "workspace:*",
     "@living-contracts/generator-validation": "workspace:*",
     "@living-contracts/schema-parser": "workspace:*",
+    "@living-contracts/types": "workspace:*",
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
     "@oclif/plugin-plugins": "^5",

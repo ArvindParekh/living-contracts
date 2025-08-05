@@ -1,33 +1,10 @@
 import path from 'path';
-import { Project } from 'ts-morph';
-import { DMMF } from '@prisma/client/runtime/library.js';
-
-export interface ValidationRule {
-  field: string;
-  type: string;
-  min?: number;
-  max?: number;
-  pattern?: string;
-  nullable: boolean;
-  unique: boolean;
-  examples: any[];
-}
-
-export interface ParsedSchema {
-  models: DMMF.Model[];
-  enums: DMMF.DatamodelEnum[];
-  datasources: any[];
-}
-
-export interface DocsContext {
-  tsProject: Project;
-  parsedSchema: ParsedSchema;
-  validationRules: Map<string, ValidationRule[]>;
-  outputBaseDir: string;
-}
+import type { GeneratorContext as DocsContext } from '@living-contracts/types';
 
 export class DocsGenerator {
-  constructor(private ctx: DocsContext) {}
+  constructor(private ctx: DocsContext) {
+    this.ctx = ctx;
+  }
 
   public generate(): string[] {
     const files: string[] = [];

@@ -1,33 +1,8 @@
 import path from 'path';
-import { Project } from 'ts-morph';
-import { DMMF } from '@prisma/client/runtime/library.js';
-
-export interface ValidationRule {
-  field: string;
-  type: string;
-  min?: number;
-  max?: number;
-  pattern?: string;
-  nullable: boolean;
-  unique: boolean;
-  examples: any[];
-}
-
-export interface ParsedSchema {
-  models: DMMF.Model[];
-  enums: DMMF.DatamodelEnum[];
-  datasources: any[];
-}
-
-export interface APIContext {
-  tsProject: Project;
-  parsedSchema: ParsedSchema;
-  validationRules: Map<string, ValidationRule[]>;
-  outputBaseDir: string;
-}
+import type { GeneratorContext as ApiContext, Model } from '@living-contracts/types';
 
 export class ApiGenerator {
-  constructor(private ctx: APIContext) {}
+  constructor(private ctx: ApiContext) {}
 
   public generate(): string[] {
     const files: string[] = [];
@@ -62,7 +37,7 @@ export class ApiGenerator {
     return str + 's';
   }
 
-  private generateAPIEndpoint(model: DMMF.Model): string {
+  private generateAPIEndpoint(model: Model): string {
     const modelLowerCase = model.name.toLowerCase();
     const modelPlural = this.pluralize(modelLowerCase);
 

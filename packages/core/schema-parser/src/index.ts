@@ -1,12 +1,6 @@
-import {DMMF} from '@prisma/client/runtime/library.js'
 import {getDMMF} from '@prisma/internals'
 import path from 'path'
-
-interface ParsedSchema {
-    models: DMMF.Model[]
-    enums: DMMF.DatamodelEnum[]
-    datasources: any[]
-  }
+import type { ParsedSchema } from '@living-contracts/types';
 
 export class SchemaParser {
     async parseSchema(schemaPath: string): Promise<ParsedSchema> {

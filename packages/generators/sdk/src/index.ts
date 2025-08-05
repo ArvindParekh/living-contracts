@@ -1,33 +1,8 @@
 import path from 'path';
-import { Project } from 'ts-morph';
-import { DMMF } from '@prisma/client/runtime/library.js';
-
-export interface ValidationRule {
-  field: string;
-  type: string;
-  min?: number;
-  max?: number;
-  pattern?: string;
-  nullable: boolean;
-  unique: boolean;
-  examples: any[];
-}
-
-export interface ParsedSchema {
-  models: DMMF.Model[];
-  enums: DMMF.DatamodelEnum[];
-  datasources: any[];
-}
-
-export interface SDKContext {
-  tsProject: Project;
-  parsedSchema: ParsedSchema;
-  validationRules: Map<string, ValidationRule[]>;
-  outputBaseDir: string;
-}
+import type { GeneratorContext as SdkContext, ParsedSchema, Field } from '@living-contracts/types';
 
 export class SdkGenerator {
-  constructor(private ctx: SDKContext) {}
+  constructor(private ctx: SdkContext) {}
 
   public generate(): string[] {
     const files: string[] = [];
@@ -63,7 +38,7 @@ export class SdkGenerator {
     return str + 's';
   }
 
-  private getPrismaType(field: DMMF.Field): string {
+  private getPrismaType(field: Field): string {
     const typeMap: Record<string, string> = {
       String: 'string',
       Int: 'number',

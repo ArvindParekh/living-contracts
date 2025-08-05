@@ -38,6 +38,9 @@ importers:
       '@living-contracts/schema-parser':
         specifier: workspace:*
         version: link:../../packages/core/schema-parser
+      '@living-contracts/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@oclif/core':
         specifier: ^4
         version: 4.5.2
@@ -222,9 +225,9 @@ importers:
 
   packages/core/schema-parser:
     dependencies:
-      '@prisma/client':
-        specifier: ^6.12.0
-        version: 6.13.0(typescript@5.9.2)
+      '@living-contracts/types':
+        specifier: workspace:*
+        version: link:../../types
       '@prisma/internals':
         specifier: ^6.11.1
         version: 6.13.0(typescript@5.9.2)
@@ -271,12 +274,9 @@ importers:
 
   packages/generators/api:
     dependencies:
-      '@prisma/client':
-        specifier: '*'
-        version: 6.13.0(typescript@5.9.2)
-      ts-morph:
-        specifier: ^26.0.0
-        version: 26.0.0
+      '@living-contracts/types':
+        specifier: workspace:*
+        version: link:../../types
     devDependencies:
       '@types/node':
         specifier: ^24.2.0
@@ -284,12 +284,9 @@ importers:
 
   packages/generators/docs:
     dependencies:
-      '@prisma/client':
-        specifier: ^6.13.0
-        version: 6.13.0(typescript@5.9.2)
-      ts-morph:
-        specifier: ^26.0.0
-        version: 26.0.0
+      '@living-contracts/types':
+        specifier: workspace:*
+        version: link:../../types
     devDependencies:
       '@types/node':
         specifier: ^24.2.0
@@ -297,9 +294,9 @@ importers:
 
   packages/generators/sdk:
     dependencies:
-      ts-morph:
-        specifier: ^26.0.0
-        version: 26.0.0
+      '@living-contracts/types':
+        specifier: workspace:*
+        version: link:../../types
     devDependencies:
       '@types/node':
         specifier: ^24.2.0
@@ -309,6 +306,19 @@ importers:
         version: 5.9.2
 
   packages/generators/validation:
+    dependencies:
+      '@living-contracts/types':
+        specifier: workspace:*
+        version: link:../../types
+    devDependencies:
+      '@types/node':
+        specifier: ^24.2.0
+        version: 24.2.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
+  packages/types:
     dependencies:
       '@prisma/client':
         specifier: ^6.13.0

@@ -8,8 +8,7 @@
     "dist"
   ],
   "dependencies": {
-    "@prisma/client": "*",
-    "ts-morph": "^26.0.0"
+    "@living-contracts/types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.2.0"

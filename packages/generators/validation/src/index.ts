@@ -1,31 +1,5 @@
 import path from 'path';
-import { Project } from 'ts-morph';
-import { DMMF } from '@prisma/client/runtime/library.js';
-
-export interface ValidationRule {
-  field: string;
-  type: string;
-  min?: number;
-  max?: number;
-  pattern?: string;
-  nullable: boolean;
-  unique: boolean;
-  examples: any[];
-}
-
-export interface ParsedSchema {
-  models: DMMF.Model[];
-  enums: DMMF.DatamodelEnum[];
-  datasources: any[];
-}
-
-export interface ValidationContext {
-  tsProject: Project;
-  parsedSchema: ParsedSchema;
-  validationRules: Map<string, ValidationRule[]>;
-  outputBaseDir: string;
-}
-
+import type { GeneratorContext as ValidationContext, ValidationRule, Field } from '@living-contracts/types';
 export class ValidationGenerator {
   constructor(private ctx: ValidationContext) {}
 
@@ -57,7 +31,7 @@ export class ValidationGenerator {
     return files;
   }
 
-  private generateZodField(field: DMMF.Field, rule?: ValidationRule): string {
+  private generateZodField(field: Field, rule?: ValidationRule): string {
     let zod = '';
     switch (field.type) {
       case 'String':
