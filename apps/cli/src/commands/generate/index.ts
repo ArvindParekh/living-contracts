@@ -6,7 +6,9 @@ import chalk from 'chalk'
 import * as fs from 'fs-extra'
 import ora from 'ora'
 import path from 'path'
+import { CodeGeneratorEngine } from '@living-contracts/code-generator'
 import {Project, ScriptTarget} from 'ts-morph'
+import {SchemaParser} from '@living-contracts/schema-parser'
 
 interface GeneratorConfig {
   output: string
@@ -55,6 +57,7 @@ export default class Generate extends Command {
 
   private configuration!: GeneratorConfig
   private tsProject!: Project
+  private engine!: CodeGeneratorEngine
   private prisma!: PrismaClient
 
   async run(): Promise<void> {
@@ -79,7 +82,9 @@ export default class Generate extends Command {
 
     let parsedSchema: ParsedSchema
     try {
-      parsedSchema = await this.parseSchema(this.configuration.prismaSchema)
+      // parsedSchema = await this.parseSchema(this.configuration.prismaSchema)
+      const parser = new SchemaParser();
+      parsedSchema = await parser.parseSchema(this.configuration.prismaSchema);
       schemaSpinner.succeed(`Found ${parsedSchema.models.length} models`)
     } catch (error) {
       schemaSpinner.fail(chalk.bold.red('Failed to parse Prisma schema.'))
@@ -89,7 +94,8 @@ export default class Generate extends Command {
     // init a ts project for code generation
     const projectSpinner = ora('Initializing TypeScript project...').start()
     try {
-      this.tsProject = await this.initTsProject()
+      this.engine = new CodeGeneratorEngine()
+      this.tsProject = this.engine.project
       projectSpinner.succeed('TypeScript project initialized')
     } catch (error) {
       projectSpinner.fail(chalk.bold.red('Failed to initialize TypeScript project.'))
@@ -149,7 +155,7 @@ export default class Generate extends Command {
     if (!flags['dry-run']) {
       const saveSpinner = ora('Saving files...').start()
       try {
-        await this.tsProject.save()
+        await this.engine.save()
         saveSpinner.succeed('Files saved')
       } catch (error) {
         saveSpinner.fail(chalk.bold.red('Failed to save files'))
@@ -224,18 +230,50 @@ export default class Generate extends Command {
     const outputBaseDir = path.join(this.configuration.output, generator)
     const files: string[] = []
     switch (generator) {
-      case 'sdk':
-        files.push(...(await this.generateSDK(parsedSchema, validationRules, outputBaseDir)))
-        break
-      case 'api':
-        files.push(...(await this.generateAPI(parsedSchema, validationRules, outputBaseDir)))
-        break
-      case 'validation':
-        files.push(...(await this.generateValidation(parsedSchema, validationRules, outputBaseDir)))
-        break
-      case 'docs':
-        files.push(...(await this.generateDocs(parsedSchema, validationRules, outputBaseDir)))
-        break
+      case 'sdk': {
+        const { SdkGenerator } = await import('@living-contracts/generator-sdk');
+        const gen = new SdkGenerator({
+          tsProject: this.tsProject,
+          parsedSchema,
+          validationRules,
+          outputBaseDir,
+        });
+        files.push(...gen.generate());
+        break;
+      }
+      case 'api': {
+        const { ApiGenerator } = await import('@living-contracts/generator-api');
+        const gen = new ApiGenerator({
+          tsProject: this.tsProject,
+          parsedSchema,
+          validationRules,
+          outputBaseDir,
+        });
+        files.push(...gen.generate());
+        break;
+      }
+      case 'validation': {
+        const { ValidationGenerator } = await import('@living-contracts/generator-validation');
+        const gen = new ValidationGenerator({
+          tsProject: this.tsProject,
+          parsedSchema,
+          validationRules,
+          outputBaseDir,
+        });
+        files.push(...gen.generate());
+        break;
+      }
+      case 'docs': {
+        const { DocsGenerator } = await import('@living-contracts/generator-docs');
+        const gen = new DocsGenerator({
+          tsProject: this.tsProject,
+          parsedSchema,
+          validationRules,
+          outputBaseDir,
+        });
+        files.push(...gen.generate());
+        break;
+      }
       default:
         this.warn(`Unsupported generator type: ${generator}`)
     }

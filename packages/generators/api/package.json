@@ -1,0 +1,12 @@
+{
+  "name": "@living-contracts/generator-api",
+  "version": "0.0.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "type": "module",
+  "files": ["dist"],
+  "dependencies": {
+    "ts-morph": "^26.0.0",
+    "@prisma/client": "*"
+  }
+}

@@ -8,6 +8,12 @@
   },
   "bugs": "https://github.com/ArvindParekh/living-contracts/issues",
   "dependencies": {
+    "@living-contracts/schema-parser": "workspace:*",
+    "@living-contracts/generator-api": "workspace:*",
+    "@living-contracts/generator-sdk": "workspace:*",
+    "@living-contracts/generator-validation": "workspace:*",
+    "@living-contracts/generator-docs": "workspace:*",
+    "@living-contracts/code-generator": "workspace:*",
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
     "@oclif/plugin-plugins": "^5",

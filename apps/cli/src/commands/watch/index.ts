@@ -54,6 +54,7 @@ export default class Watch extends Command {
   async run(): Promise<void> {
     const {flags} = await this.parse(Watch)
 
+
     this.log(
       chalk.cyan(`
             ╦  ╦╦  ╦╦╔╗╔╔═╗  ╔═╗╔═╗╔╗╔╔╦╗╦═╗╔═╗╔═╗╔╦╗╔═╗
