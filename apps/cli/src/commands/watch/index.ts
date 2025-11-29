@@ -2,13 +2,20 @@ import {Command, Flags} from '@oclif/core'
 import chalk from 'chalk'
 import chokidar, {FSWatcher} from 'chokidar'
 import path from 'path'
-import * as fs from 'fs-extra'
-import {debounce} from 'lodash'
+import fs from 'fs-extra'
+import pkg from 'lodash'
+const {debounce} = pkg
 import ora from 'ora'
 import {promisify} from 'util'
 import {exec} from 'child_process'
 import {Server} from 'socket.io'
 import {createServer} from 'http'
+import {ValidationInferenceService} from '@living-contracts/ai-inference'
+import {SchemaParser} from '@living-contracts/schema-parser'
+import {PrismaClient} from '@prisma/client/extension'
+import PrismaInternals from '@prisma/internals'
+const {getConfig} = PrismaInternals
+import {ValidationRule} from '@living-contracts/types'
 
 const execAsync = promisify(exec)
 
@@ -57,6 +64,7 @@ export default class Watch extends Command {
   private lastGenerationTime?: Date
   private watcher?: FSWatcher
   private io?: Server
+  private prisma?: PrismaClient
 
   async run(): Promise<void> {
     const {flags} = await this.parse(Watch)
@@ -157,6 +165,9 @@ export default class Watch extends Command {
       this.log(chalk.yellow('\n\n👋 Stopping watcher...'))
       this.watcher?.close()
       this.io?.close()
+      if (this.prisma) {
+        await this.prisma.$disconnect()
+      }
 
       // show final stats
       if (this.generationCount > 0) {
@@ -235,6 +246,10 @@ export default class Watch extends Command {
       this.io?.emit('status', 'idle')
       this.emitConfig() // Re-emit schema as it might have changed
 
+      if (this.configuration.inferValidation) {
+        await this.runInference()
+      }
+
     } catch (error) {
       spinner.fail(chalk.red('❌ Generation failed!'))
       this.io?.emit('status', 'error')
@@ -298,5 +313,59 @@ export default class Watch extends Command {
     if (ms < 60000) return `${Math.floor(ms / 1000)}s`
     if (ms < 3600000) return `${Math.floor(ms / 60000)}m`
     return `${Math.floor(ms / 3600000)}h`
+  }
+
+  private async runInference() {
+    this.io?.emit('status', 'generating')
+    const spinner = ora('Inferring validation rules...').start()
+    
+    try {
+      // connect to DB if not connected
+      if (!this.prisma) {
+        const prismaConfig = await getConfig({
+          datamodel: this.configuration.prismaSchema,
+        })
+        const datasourceUrl = prismaConfig.datasources[0]?.url.value
+
+        if (datasourceUrl) {
+          this.prisma = new PrismaClient({
+            datasourceUrl: datasourceUrl,
+          })
+        }
+      }
+
+      if (!this.prisma) {
+        spinner.info('No database connection found, skipping inference')
+        return
+      }
+
+      // parse schema
+      const parser = new SchemaParser()
+      const parsedSchema = await parser.parseSchema(this.configuration.prismaSchema)
+
+      // run inference
+      const service = new ValidationInferenceService(this.prisma, {
+        sampleSize: 50,
+        aiProvider: 'openai',
+      })
+
+      const rules = await service.inferRules(parsedSchema.models)
+      
+      // convert map to object for socket transmission
+      const rulesObj: Record<string, ValidationRule[]> = {}
+      rules.forEach((value, key) => {
+        rulesObj[key] = value
+      })
+
+      this.io?.emit('validation-rules', rulesObj)
+      spinner.succeed(`Inferred validation rules for ${rules.size} models`)
+      this.emitLog('success', `Inferred validation rules for ${rules.size} models`)
+
+    } catch (error) {
+      spinner.fail('Failed to infer validation rules')
+      this.emitLog('error', `Inference failed: ${error}`)
+    } finally {
+      this.io?.emit('status', 'idle')
+    }
   }
 }

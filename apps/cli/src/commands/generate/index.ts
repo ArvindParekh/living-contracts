@@ -5,9 +5,10 @@ import {CodeGeneratorEngine} from '@living-contracts/code-generator'
 import {SchemaParser} from '@living-contracts/schema-parser'
 import {Command, Flags} from '@oclif/core'
 import {PrismaClient} from '@prisma/client/extension'
-import {getConfig} from '@prisma/internals'
+import PrismaInternals from '@prisma/internals'
+const {getConfig} = PrismaInternals
 import chalk from 'chalk'
-import * as fs from 'fs-extra'
+import fs from 'fs-extra'
 import path from 'node:path'
 import ora from 'ora'
 
@@ -155,9 +156,12 @@ export default class Generate extends Command {
   }
 
   private async loadConfig(): Promise<GeneratorConfig> {
-    const configPath = path.join(process.cwd(), '.living-contracts.json')
-
-    return (await fs.readJson(configPath)) as GeneratorConfig
+    const configPath = path.join(process.cwd(), 'living-contracts.json')
+    try {
+      return (await fs.readJson(configPath)) as GeneratorConfig
+    } catch (error) {
+      throw error
+    }
   }
 
   private async inferValidationRules(models: Model[]): Promise<Map<string, ValidationRule[]>> {

@@ -194,7 +194,7 @@ Initialize a new living contracts project
     if (answers.validation) {
       this.log(chalk.cyan('  3. Run`npm run contracts:validate` to validate your data'))
     }
-    this.log(chalk.cyan('  4. Import generated types from ' + chalk.bold(`./${answers.output}`)))
+    this.log(chalk.cyan('  4. Import generated types from ' + chalk.bold(`${answers.output}`)))
     this.log()
     this.log(chalk.bold.blue('Need help? Run "living-contracts --help"'))
   }

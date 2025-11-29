@@ -17,6 +17,7 @@ interface SocketState {
   status: "idle" | "generating" | "error";
   schema: string | null;
   config: any | null;
+  validationRules: Record<string, any[]> | null;
 }
 
 // Singleton state to share across components
@@ -30,6 +31,7 @@ let state: SocketState = {
   status: "idle",
   schema: null,
   config: null,
+  validationRules: null,
 };
 
 const notifyListeners = () => {
@@ -76,6 +78,11 @@ export function useSocket() {
 
       socket.on("config", (config: any) => {
         state.config = config;
+        notifyListeners();
+      });
+
+      socket.on("validation-rules", (rules: any) => {
+        state.validationRules = rules;
         notifyListeners();
       });
     }
