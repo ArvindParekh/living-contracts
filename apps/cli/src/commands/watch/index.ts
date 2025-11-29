@@ -12,7 +12,7 @@ import {Server} from 'socket.io'
 import {createServer} from 'http'
 import {ValidationInferenceService} from '@living-contracts/ai-inference'
 import {SchemaParser} from '@living-contracts/schema-parser'
-import {PrismaClient} from '@prisma/client/extension'
+import pg from 'pg'
 import PrismaInternals from '@prisma/internals'
 const {getConfig} = PrismaInternals
 import {ValidationRule} from '@living-contracts/types'
@@ -64,7 +64,7 @@ export default class Watch extends Command {
   private lastGenerationTime?: Date
   private watcher?: FSWatcher
   private io?: Server
-  private prisma?: PrismaClient
+  private dbPool?: pg.Pool
 
   async run(): Promise<void> {
     const {flags} = await this.parse(Watch)
@@ -165,8 +165,10 @@ export default class Watch extends Command {
       this.log(chalk.yellow('\n\n👋 Stopping watcher...'))
       this.watcher?.close()
       this.io?.close()
-      if (this.prisma) {
-        await this.prisma.$disconnect()
+      this.watcher?.close()
+      this.io?.close()
+      if (this.dbPool) {
+        await this.dbPool.end()
       }
 
       // show final stats
@@ -321,20 +323,20 @@ export default class Watch extends Command {
     
     try {
       // connect to DB if not connected
-      if (!this.prisma) {
+      if (!this.dbPool) {
         const prismaConfig = await getConfig({
           datamodel: this.configuration.prismaSchema,
+          ignoreEnvVarErrors: true,
         })
-        const datasourceUrl = prismaConfig.datasources[0]?.url.value
+        const datasource = prismaConfig.datasources[0]
+        const datasourceUrl = datasource?.url.value
 
         if (datasourceUrl) {
-          this.prisma = new PrismaClient({
-            datasourceUrl: datasourceUrl,
-          })
+          this.dbPool = await this.createDbConnection(datasource.activeProvider, datasourceUrl)
         }
       }
 
-      if (!this.prisma) {
+      if (!this.dbPool) {
         spinner.info('No database connection found, skipping inference')
         return
       }
@@ -344,9 +346,9 @@ export default class Watch extends Command {
       const parsedSchema = await parser.parseSchema(this.configuration.prismaSchema)
 
       // run inference
-      const service = new ValidationInferenceService(this.prisma, {
+      const service = new ValidationInferenceService(this.dbPool, {
         sampleSize: 50,
-        aiProvider: 'openai',
+        aiProvider: 'gemini'
       })
 
       const rules = await service.inferRules(parsedSchema.models)
@@ -366,6 +368,26 @@ export default class Watch extends Command {
       this.emitLog('error', `Inference failed: ${error}`)
     } finally {
       this.io?.emit('status', 'idle')
+    }
+  }
+
+  private async createDbConnection(provider: string, url: string): Promise<pg.Pool> {
+    switch (provider) {
+      case 'postgresql':
+      case 'cockroachdb':
+        return new pg.Pool({
+          connectionString: url,
+        })
+      case 'mysql':
+        // TODO: Add mysql2 support
+        throw new Error('MySQL support coming soon. Currently only PostgreSQL is supported.')
+
+      case 'sqlite':
+        // TODO: Add better-sqlite3 support
+        throw new Error('SQLite support coming soon. Currently only PostgreSQL is supported.')
+
+      default:
+        throw new Error(`Unsupported database provider: ${provider}`)
     }
   }
 }

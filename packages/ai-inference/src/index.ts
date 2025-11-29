@@ -2,6 +2,7 @@ import type { Model, ValidationRule } from "@living-contracts/types";
 import { StatisticalAnalyzer } from "./statistical-analyzer.js";
 import { AIPatternRecognizer } from "./ai-recognizer.js";
 import type { InferenceConfig } from "./types.js";
+import type { Pool } from "pg";
 
 export * from "./types.js";
 export * from "./statistical-analyzer.js";
@@ -12,15 +13,19 @@ export class ValidationInferenceService {
   private aiRecognizer: AIPatternRecognizer;
 
   constructor(
-    private prisma: any,
+    private db: Pool,
     private config: Partial<InferenceConfig> = {},
   ) {
-    this.statsAnalyzer = new StatisticalAnalyzer(prisma);
+    this.statsAnalyzer = new StatisticalAnalyzer(db);
     this.aiRecognizer = new AIPatternRecognizer();
   }
 
   async inferRules(models: Model[]): Promise<Map<string, ValidationRule[]>> {
     const rulesMap = new Map<string, ValidationRule[]>();
+    
+    // default to 10 RPM (Gemini free tier) if not specified
+    const rpm = this.config.requestsPerMinute || 10;
+    const delayMs = (60 * 1000) / rpm;
 
     for (const model of models) {
       const modelRules: ValidationRule[] = [];
@@ -49,14 +54,15 @@ export class ValidationInferenceService {
         // only for strings that are not enums and don't have a clear format yet
         if (field.type === "String" && !field.isList) {
           // fetch sample for AI
-          const sample = await this.prisma[model.name].findMany({
-            where: { [field.name]: { not: null } },
-            select: { [field.name]: true },
-            take: this.config.sampleSize || 50,
-            distinct: [field.name],
-          });
+          const tableName = model.dbName || model.name;
+          const columnName = field.dbName || field.name;
+          
+          const result = await this.db.query(
+            `SELECT DISTINCT "${columnName}" FROM "${tableName}" WHERE "${columnName}" IS NOT NULL LIMIT $1`,
+            [this.config.sampleSize || 50]
+          );
 
-          const values = sample.map((s: any) => s[field.name]);
+          const values = result.rows.map((s: any) => s[columnName]);
 
           if (values.length > 0) {
             const aiResult = await this.aiRecognizer.inferPattern(
@@ -64,6 +70,9 @@ export class ValidationInferenceService {
               field.name,
               values,
             );
+
+            // Rate limiting: wait before next request
+            await new Promise(resolve => setTimeout(resolve, delayMs));
 
             if (aiResult) {
               if (aiResult.pattern) rule.pattern = aiResult.pattern;

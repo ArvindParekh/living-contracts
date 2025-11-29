@@ -45,7 +45,7 @@ export function SchemaVisualizer() {
               <TableBody>
                 {model.fields.map((field) => {
                   const rules = validationRules?.[model.name]?.filter(r => r.field === field.name) || [];
-                  const rule = rules[0]; // Assuming one rule object per field for now, or we can iterate
+                  const rule = rules[0];
 
                   return (
                     <TableRow key={field.name}>

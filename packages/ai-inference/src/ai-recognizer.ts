@@ -1,5 +1,5 @@
 import { generateObject } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
 import { SYSTEM_PROMPT, USER_PROMPT_TEMPLATE } from './prompts/validation.js';
 import type { PatternInferenceResult } from './types.js';
@@ -12,11 +12,13 @@ const PatternSchema = z.object({
 
 
 export class AIPatternRecognizer {
-  private openai: ReturnType<typeof createOpenAI>;
+  private google: ReturnType<typeof createGoogleGenerativeAI>;
 
   constructor(apiKey?: string) {
-    const key = apiKey || process.env.OPENAI_API_KEY;
-    this.openai = createOpenAI();
+    const key = apiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    this.google = createGoogleGenerativeAI(
+      key ? { apiKey: key } : undefined
+    );
   }
 
   async inferPattern(model: string, field: string, values: any[]): Promise<PatternInferenceResult | null> {
@@ -32,7 +34,7 @@ export class AIPatternRecognizer {
 
     try {
       const result = await generateObject({
-        model: this.openai('gpt-4.1-mini'),
+        model: this.google('gemini-2.0-flash-exp'),
         schema: PatternSchema,
         system: SYSTEM_PROMPT,
         prompt: USER_PROMPT_TEMPLATE(model, field, samples),

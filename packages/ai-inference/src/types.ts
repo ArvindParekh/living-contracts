@@ -2,8 +2,9 @@ import type { Model, Field, ValidationRule } from '@living-contracts/types';
 
 export interface InferenceConfig {
   sampleSize: number;
-  aiProvider: 'openai';
+  aiProvider: 'gemini';
   aiModel: string;
+  requestsPerMinute?: number;
 }
 
 export interface FieldStats {

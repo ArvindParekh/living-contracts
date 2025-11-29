@@ -1,19 +1,21 @@
 import type { Model, Field } from '@living-contracts/types';
+import type { Pool } from 'pg';
 import type { FieldStats } from './types.js';
 
 export class StatisticalAnalyzer {
-  constructor(private prisma: any) {}
+  constructor(private db: Pool) {}
 
   async analyze(model: Model, field: Field): Promise<FieldStats> {
     const stats: FieldStats = {};
-    const modelName = model.name;
-    const fieldName = field.name;
+    const modelName = model.dbName || model.name;
+    const fieldName = field.dbName || field.name;
 
     try {
       if (!field.isRequired) {
-        const nullCount = await this.prisma[modelName].count({
-          where: { [fieldName]: null },
-        });
+        const result = await this.db.query(
+          `SELECT COUNT(*) as count FROM "${modelName}" WHERE "${fieldName}" IS NULL`
+        );
+        const nullCount = parseInt(result.rows[0].count);
         stats.hasNulls = nullCount > 0;
       }
 
@@ -40,11 +42,11 @@ export class StatisticalAnalyzer {
     // we can limit the sample size.
 
     const sampleSize = 1000;
-    const data = await this.prisma[model].findMany({
-      where: { [field]: { not: null } },
-      select: { [field]: true },
-      take: sampleSize,
-    });
+    const result = await this.db.query(
+      `SELECT "${field}" FROM "${model}" WHERE "${field}" IS NOT NULL LIMIT $1`,
+      [sampleSize]
+    );
+    const data = result.rows;
 
     if (data.length === 0) return;
 
@@ -54,24 +56,21 @@ export class StatisticalAnalyzer {
   }
 
   private async analyzeNumber(model: string, field: string, stats: FieldStats) {
-    const aggregate = await this.prisma[model].aggregate({
-      _min: { [field]: true },
-      _max: { [field]: true },
-    });
+    const result = await this.db.query(
+      `SELECT MIN("${field}") as min, MAX("${field}") as max FROM "${model}"`
+    );
 
-    stats.min = aggregate._min[field];
-    stats.max = aggregate._max[field];
+    stats.min = result.rows[0].min;
+    stats.max = result.rows[0].max;
   }
 
   private async analyzeEnum(model: string, field: string, stats: FieldStats) {
     // get distinct values
-    const distinct = await this.prisma[model].findMany({ // trade off: loads all data in memory, could be slow for huge dbs. better approach would be to execute native sql commands using prisma
-      where: { [field]: { not: null } },
-      distinct: [field],
-      select: { [field]: true },
-    });
+    const result = await this.db.query(
+      `SELECT DISTINCT "${field}" FROM "${model}" WHERE "${field}" IS NOT NULL`
+    );
 
-    stats.distinctValues = distinct.map((d: any) => d[field]);
-    stats.distinctCount = distinct.length;
+    stats.distinctValues = result.rows.map((d: any) => d[field]);
+    stats.distinctCount = result.rows.length;
   }
 }

@@ -12,6 +12,7 @@ import chalk from 'chalk'
 import fs from 'fs-extra'
 import path from 'node:path'
 import ora from 'ora'
+import pg from 'pg'
 
 export default class Generate extends Command {
   static description =
@@ -37,7 +38,7 @@ export default class Generate extends Command {
   private configuration!: GeneratorConfig
   private tsProject!: tsProject
   private engine!: CodeGeneratorEngine
-  private prisma!: PrismaClient
+  private dbPool: pg.Pool | null = null
 
   async run(): Promise<void> {
     const {flags} = await this.parse(Generate)
@@ -96,13 +97,12 @@ export default class Generate extends Command {
           ignoreEnvVarErrors: false,
         })
         console.log(`prismaConfig: ${JSON.stringify(prismaConfig)}`)
-        const datasourceUrl = prismaConfig.datasources[0].url.value
+        const datasource = prismaConfig.datasources[0];
+        const datasourceUrl = datasource.url.value;
 
         if (datasourceUrl) {
           dbSpinner.text = 'Inferring validation rules from database...'
-          this.prisma = new PrismaClient({
-            datasourceUrl: datasourceUrl,
-          })
+          this.dbPool = await this.createDbConnection(datasource.activeProvider, datasourceUrl);
 
           // infer validation rules
           validationRules = await this.inferValidationRules(parsedSchema.models)
@@ -148,9 +148,9 @@ export default class Generate extends Command {
       }
     }
 
-    // done - disconnect from db - success message
-    if (this.prisma) {
-      await this.prisma.$disconnect()
+    // done - cleanup
+    if (this.dbPool) {
+      await this.dbPool.end()
     }
 
     this.log()
@@ -175,11 +175,13 @@ export default class Generate extends Command {
   }
 
   private async inferValidationRules(models: Model[]): Promise<Map<string, ValidationRule[]>> {
-    // casting prisma to any because the type is generated at runtime
-    // and we don't want to depend on the generated client in the CLI source
-    const service = new ValidationInferenceService(this.prisma, {
+    if (!this.dbPool) {
+      return new Map()
+    }
+
+    const service = new ValidationInferenceService(this.dbPool, {
       sampleSize: 50,
-      aiProvider: 'openai',
+      aiProvider: 'gemini'
     })
 
     const spinner = ora('Inferring validation rules (this may take a moment)...').start()
@@ -252,5 +254,25 @@ export default class Generate extends Command {
     }
 
     return files
+  }
+
+  private async createDbConnection(provider: string, url: string): Promise<pg.Pool> {
+    switch (provider) {
+      case 'postgresql':
+      case 'cockroachdb':
+        return new pg.Pool({
+          connectionString: url,
+        })
+      case 'mysql':
+        // TODO: Add mysql2 support
+        throw new Error('MySQL support coming soon. Currently only PostgreSQL is supported.')
+
+      case 'sqlite':
+        // TODO: Add better-sqlite3 support
+        throw new Error('SQLite support coming soon. Currently only PostgreSQL is supported.')
+
+      default:
+        throw new Error(`Unsupported database provider: ${provider}`)
+    }
   }
 }
