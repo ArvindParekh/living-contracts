@@ -6,6 +6,7 @@ import {SchemaParser} from '@living-contracts/schema-parser'
 import {Command, Flags} from '@oclif/core'
 import {PrismaClient} from '@prisma/client/extension'
 import PrismaInternals from '@prisma/internals'
+import dotenv from 'dotenv'
 const {getConfig} = PrismaInternals
 import chalk from 'chalk'
 import fs from 'fs-extra'
@@ -83,10 +84,18 @@ export default class Generate extends Command {
     let validationRules: Map<string, ValidationRule[]> = new Map()
     if (this.configuration.inferValidation) {
       const dbSpinner = ora('Connecting to database...').start()
+      console.log(`this.configuration: ${JSON.stringify(this.configuration)}`)
       try {
+        const envPath = path.join(process.cwd(), '.env')
+        if (fs.existsSync(envPath)) {
+          dotenv.config({ path: envPath })
+        }
+        const schema = fs.readFileSync(this.configuration.prismaSchema, 'utf-8')
         const prismaConfig = await getConfig({
-          datamodel: this.configuration.prismaSchema,
+          datamodel: schema,
+          ignoreEnvVarErrors: false,
         })
+        console.log(`prismaConfig: ${JSON.stringify(prismaConfig)}`)
         const datasourceUrl = prismaConfig.datasources[0].url.value
 
         if (datasourceUrl) {
@@ -102,6 +111,7 @@ export default class Generate extends Command {
           dbSpinner.succeed('No database connection found, skipping validation inference.')
         }
       } catch (error) {
+        console.log(error)
         dbSpinner.fail(chalk.bold.red('Failed to connect to database.'))
         this.error('Please check your database connection and try again.')
       }
