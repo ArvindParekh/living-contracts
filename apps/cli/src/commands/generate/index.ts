@@ -1,13 +1,15 @@
-import {Command, Flags} from '@oclif/core'
+import type {GeneratorConfig, Model, ParsedSchema, tsProject, ValidationRule} from '@living-contracts/types'
+
+import {ValidationInferenceService} from '@living-contracts/ai-inference'
+import {CodeGeneratorEngine} from '@living-contracts/code-generator'
 import {SchemaParser} from '@living-contracts/schema-parser'
-import { PrismaClient } from '@prisma/client/extension'
+import {Command, Flags} from '@oclif/core'
+import {PrismaClient} from '@prisma/client/extension'
 import {getConfig} from '@prisma/internals'
 import chalk from 'chalk'
 import * as fs from 'fs-extra'
+import path from 'node:path'
 import ora from 'ora'
-import path from 'path'
-import { CodeGeneratorEngine } from '@living-contracts/code-generator'
-import type { GeneratorConfig, ParsedSchema, ValidationRule, Model, tsProject} from '@living-contracts/types'
 
 export default class Generate extends Command {
   static description =
@@ -57,8 +59,8 @@ export default class Generate extends Command {
 
     let parsedSchema: ParsedSchema
     try {
-      const parser = new SchemaParser();
-      parsedSchema = await parser.parseSchema(this.configuration.prismaSchema);
+      const parser = new SchemaParser()
+      parsedSchema = await parser.parseSchema(this.configuration.prismaSchema)
       schemaSpinner.succeed(`Found ${parsedSchema.models.length} models`)
     } catch (error) {
       schemaSpinner.fail(chalk.bold.red('Failed to parse Prisma schema.'))
@@ -159,10 +161,23 @@ export default class Generate extends Command {
   }
 
   private async inferValidationRules(models: Model[]): Promise<Map<string, ValidationRule[]>> {
-    // TODO: implement AI validation inference logic - use structured outputs
-    const rules: Map<string, ValidationRule[]> = new Map()
+    // casting prisma to any because the type is generated at runtime
+    // and we don't want to depend on the generated client in the CLI source
+    const service = new ValidationInferenceService(this.prisma, {
+      sampleSize: 50,
+      aiProvider: 'openai',
+    })
 
-    return rules
+    const spinner = ora('Inferring validation rules (this may take a moment)...').start()
+    try {
+      const rules = await service.inferRules(models)
+      spinner.succeed(`Inferred validation rules for ${rules.size} models`)
+      return rules
+    } catch (error) {
+      spinner.fail('Failed to infer validation rules')
+      this.warn(error as Error)
+      return new Map()
+    }
   }
 
   private async runGenerator(
@@ -175,48 +190,48 @@ export default class Generate extends Command {
     const files: string[] = []
     switch (generator) {
       case 'sdk': {
-        const { SdkGenerator } = await import('@living-contracts/generator-sdk');
+        const {SdkGenerator} = await import('@living-contracts/generator-sdk')
         const gen = new SdkGenerator({
           tsProject: this.tsProject,
           parsedSchema,
           validationRules,
           outputBaseDir,
-        });
-        files.push(...gen.generate());
-        break;
+        })
+        files.push(...gen.generate())
+        break
       }
       case 'api': {
-        const { ApiGenerator } = await import('@living-contracts/generator-api');
+        const {ApiGenerator} = await import('@living-contracts/generator-api')
         const gen = new ApiGenerator({
           tsProject: this.tsProject,
           parsedSchema,
           validationRules,
           outputBaseDir,
-        });
-        files.push(...gen.generate());
-        break;
+        })
+        files.push(...gen.generate())
+        break
       }
       case 'validation': {
-        const { ValidationGenerator } = await import('@living-contracts/generator-validation');
+        const {ValidationGenerator} = await import('@living-contracts/generator-validation')
         const gen = new ValidationGenerator({
           tsProject: this.tsProject,
           parsedSchema,
           validationRules,
           outputBaseDir,
-        });
-        files.push(...gen.generate());
-        break;
+        })
+        files.push(...gen.generate())
+        break
       }
       case 'docs': {
-        const { DocsGenerator } = await import('@living-contracts/generator-docs');
+        const {DocsGenerator} = await import('@living-contracts/generator-docs')
         const gen = new DocsGenerator({
           tsProject: this.tsProject,
           parsedSchema,
           validationRules,
           outputBaseDir,
-        });
-        files.push(...gen.generate());
-        break;
+        })
+        files.push(...gen.generate())
+        break
       }
       default:
         this.warn(`Unsupported generator type: ${generator}`)

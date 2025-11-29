@@ -1,7 +1,7 @@
 import {Command, Flags} from '@oclif/core'
 import chalk from 'chalk'
 import {findUp} from 'find-up'
-import { createPromptModule } from 'inquirer'
+import {createPromptModule} from 'inquirer'
 import ora from 'ora'
 import path from 'path'
 import fs from 'fs-extra'
@@ -160,42 +160,42 @@ Initialize a new living contracts project
 
     // initial generation?
     if (answers.generators.length > 0) {
-        this.log();
+      this.log()
 
-        const { runGenerate } = await prompt([
-            {
-                type: 'confirm',
-                name: 'runGenerate',
-                message: 'Run initial generation now?',
-                default: true,
-            }
-        ])
+      const {runGenerate} = await prompt([
+        {
+          type: 'confirm',
+          name: 'runGenerate',
+          message: 'Run initial generation now?',
+          default: true,
+        },
+      ])
 
-        if (runGenerate) {
-            this.log();
-            this.log(chalk.gray('Running: living-contracts generate'));
+      if (runGenerate) {
+        this.log()
+        this.log(chalk.gray('Running: living-contracts generate'))
 
-            // call generate command here
+        // call generate command here
 
-            this.log(chalk.green('✨ Initial generation complete!'))
-        }
+        this.log(chalk.green('✨ Initial generation complete!'))
+      }
     }
 
     // final success message
-    this.log();
-    this.log(chalk.bold.green('✅ Living Contracts initialized successfully!'));
-    this.log();
+    this.log()
+    this.log(chalk.bold.green('✅ Living Contracts initialized successfully!'))
+    this.log()
 
     this.log('Next steps:')
     this.log(chalk.cyan('  1. Run`npm run contracts:generate` to generate files'))
     if (answers.watch) {
-        this.log(chalk.cyan('  2. Run`npm run contracts:watch` for automatic regeneration'))
+      this.log(chalk.cyan('  2. Run`npm run contracts:watch` for automatic regeneration'))
     }
     if (answers.validation) {
-        this.log(chalk.cyan('  3. Run`npm run contracts:validate` to validate your data'))
+      this.log(chalk.cyan('  3. Run`npm run contracts:validate` to validate your data'))
     }
-    this.log(chalk.cyan('  4. Import generated types from '+ chalk.bold(`./${answers.output}`)))
-    this.log();
+    this.log(chalk.cyan('  4. Import generated types from ' + chalk.bold(`./${answers.output}`)))
+    this.log()
     this.log(chalk.bold.blue('Need help? Run "living-contracts --help"'))
   }
 
