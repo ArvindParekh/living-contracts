@@ -7,6 +7,8 @@ import {debounce} from 'lodash'
 import ora from 'ora'
 import {promisify} from 'util'
 import {exec} from 'child_process'
+import {Server} from 'socket.io'
+import {createServer} from 'http'
 
 const execAsync = promisify(exec)
 
@@ -44,16 +46,20 @@ export default class Watch extends Command {
       description: 'Run generation immediately on start',
       default: true,
     }),
+    port: Flags.integer({
+      description: 'Port for the dashboard socket server',
+      default: 3001,
+    }),
   }
 
   private configuration!: WatchConfig
   private generationCount = 0
   private lastGenerationTime?: Date
   private watcher?: FSWatcher
+  private io?: Server
 
   async run(): Promise<void> {
     const {flags} = await this.parse(Watch)
-
 
     this.log(
       chalk.cyan(`
@@ -64,9 +70,39 @@ export default class Watch extends Command {
     )
     this.log(chalk.bold('👀 Schema Watcher Active\n'))
 
+    // start socket server
+    const httpServer = createServer()
+    this.io = new Server(httpServer, {
+      cors: {
+        origin: '*',
+        methods: ['GET', 'POST'],
+      },
+    })
+
+    httpServer.listen(flags.port, () => {
+      this.log(chalk.blue(`📡 Dashboard Socket Server running on port ${flags.port}`))
+    })
+
+    this.io.on('connection', (socket) => {
+      this.log(chalk.dim('🔌 Dashboard connected'))
+      
+      // sending initial state
+      socket.emit('log', {
+        id: Date.now().toString(),
+        timestamp: new Date(),
+        level: 'info',
+        message: 'Connected to Living Contracts CLI',
+      })
+
+      if (this.configuration) {
+        this.emitConfig()
+      }
+    })
+
     try {
       this.configuration = await this.loadConfig()
       if (flags.schema) this.configuration.prismaSchema = flags.schema
+      this.emitConfig()
     } catch (error) {
       this.error('No configuration found. Run "living-contracts init" first!')
     }
@@ -108,9 +144,11 @@ export default class Watch extends Command {
         if (flags.clear) console.clear()
 
         this.log(chalk.yellow('\n⚡ Schema change detected!'))
+        this.emitLog('info', 'Schema change detected')
         await debounceGenerate('change')
       })
       .on('error', (error) => {
+        this.emitLog('error', `Watcher error: ${error}`)
         this.error(`Watcher error: ${error}`)
       })
 
@@ -118,6 +156,7 @@ export default class Watch extends Command {
     process.on('SIGINT', async () => {
       this.log(chalk.yellow('\n\n👋 Stopping watcher...'))
       this.watcher?.close()
+      this.io?.close()
 
       // show final stats
       if (this.generationCount > 0) {
@@ -136,12 +175,33 @@ export default class Watch extends Command {
 
   private async loadConfig(): Promise<WatchConfig> {
     const configPath = path.join(process.cwd(), '.living-contracts.json')
-
     return await fs.readJson(configPath)
+  }
+
+  private emitConfig() {
+    this.io?.emit('config', this.configuration)
+    // also try to read schema content and emit it
+    try {
+      const schemaContent = fs.readFileSync(this.configuration.prismaSchema, 'utf-8')
+      this.io?.emit('schema', schemaContent)
+    } catch (e) {
+      // ignore for now
+    }
+  }
+
+  private emitLog(level: 'info' | 'warn' | 'error' | 'success', message: string) {
+    this.io?.emit('log', {
+      id: Date.now().toString(),
+      timestamp: new Date(),
+      level,
+      message,
+    })
   }
 
   private async runGeneration(changeType: string): Promise<void> {
     const startTime = Date.now()
+    this.io?.emit('status', 'generating')
+    
     const spinner = ora({
       text: 'Generating contracts...',
       spinner: 'dots12',
@@ -154,6 +214,7 @@ export default class Watch extends Command {
 
       const duration = Date.now() - startTime
       spinner.succeed(chalk.green(`✅ Generated in ${duration}ms`))
+      this.emitLog('success', `Generated in ${duration}ms`)
 
       this.generationCount++
       this.lastGenerationTime = new Date()
@@ -170,33 +231,13 @@ export default class Watch extends Command {
         }
       }
 
-      // check for breaking changes (if this isn't the initial run)
-      // TODO: this later
-      //   if (changeType !== 'initial' && this.generationCount > 1) {
-      //     const breakingChanges = await this.checkForBreakingChanges()
-      //   }
-
       this.log()
+      this.io?.emit('status', 'idle')
+      this.emitConfig() // Re-emit schema as it might have changed
 
-      const messages = [
-        '🚀 Hot reload magic!',
-        '⚡ Faster than light!',
-        '🎯 Perfect sync achieved!',
-        '🔥 On fire today!',
-        '💫 Cosmic alignment complete!',
-        '🌟 Stellar performance!',
-        '⚡ Lightning fast!',
-        '🎨 Beautifully generated!',
-        '🛸 Out of this world!',
-        '🏎️  Formula 1 speed!',
-      ]
-
-      if (this.generationCount % 5 === 0) {
-        this.log(chalk.cyan(messages[Math.floor(Math.random() * messages.length)]))
-        this.log()
-      }
     } catch (error) {
       spinner.fail(chalk.red('❌ Generation failed!'))
+      this.io?.emit('status', 'error')
 
       const errMsg = (error as any).stderr || (error as any).message || error
       const lines = errMsg.toString().split('\n').filter(Boolean)
@@ -205,6 +246,7 @@ export default class Watch extends Command {
       lines.forEach((line: string) => {
         if (line.includes('Error:')) {
           this.log(chalk.red(`   ${line}`))
+          this.emitLog('error', line)
         } else {
           this.log(chalk.gray(`   ${line}`))
         }
