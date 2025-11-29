@@ -24,6 +24,20 @@ model User {
 // Validation? Rejecting the new field.
 ```
 
+```mermaid
+graph TD
+    subgraph "Day 1: In Sync"
+        DB1[Database] <--> API1[API] <--> FE1[Frontend]
+    end
+    
+    subgraph "Day 30: The Drift"
+        DB2[Database] -- "Schema Change" --> API2[API]
+        API2 -. "Broken Contract" .- FE2[Frontend]
+        style API2 stroke:#f00,stroke-width:2px
+        style FE2 stroke:#f00,stroke-width:2px
+    end
+```
+
 ## The Solution
 
 Living Contracts creates a **living connection** between your database and your entire API surface:
@@ -114,14 +128,15 @@ const user = await api.users.create({
 ## How It Works
 
 ```mermaid
-graph LR
-    A[Prisma Schema] --> B[Living Contracts]
-    C[Database Data] --> B
-    B --> D[TypeScript SDK]
-    B --> E[API Endpoints]
-    B --> F[Validation Rules]
-    B --> G[Documentation]
-    B --> H[Migration Guides]
+graph TD
+    A[schema.prisma] -->|Parse| B(Schema Parser)
+    C[Database Data] -->|Analyze| D(Validation Inference)
+    B --> E{Code Generator}
+    D --> E
+    E --> F[Generated SDK]
+    E --> G[API Endpoints]
+    E --> H[Zod Schemas]
+    E --> I[Documentation]
 ```
 
 1. **Watches** your Prisma schema for changes
@@ -129,6 +144,34 @@ graph LR
 1. **Generates** everything you need for a type-safe API
 1. **Detects** breaking changes before they break
 1. **Guides** migrations with AI-powered suggestions
+
+## Architecture
+
+```mermaid
+classDiagram
+    class CLI {
+        +generate()
+        +watch()
+    }
+    class SchemaParser {
+        +parse(schemaPath)
+    }
+    class InferenceEngine {
+        +inferRules(data)
+        +detectPatterns()
+    }
+    class Generators {
+        +SdkGenerator
+        +ApiGenerator
+        +ValidationGenerator
+        +DocsGenerator
+    }
+
+    CLI --> SchemaParser : Uses
+    CLI --> InferenceEngine : Uses
+    CLI --> Generators : Orchestrates
+    InferenceEngine ..> Generators : Feeds Rules
+```
 
 ## CLI Commands
 
